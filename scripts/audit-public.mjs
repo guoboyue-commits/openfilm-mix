@@ -21,7 +21,7 @@
  * Prints the findings by file:line and exits 1 if there are any. A genuine false positive goes in ALLOWED (or, for a
  * secret, in .gitleaks.toml), with the reason.
  *
- *   node scripts/audit-public.mjs [--dir <repository>] [--terms <file>] [--no-secrets]
+ *   node scripts/audit-public.mjs [--dir <repository>] [--terms <file>] [--no-secrets] [--skip-cjk]
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
@@ -34,6 +34,7 @@ const { values: opts } = parseArgs({
     dir: { type: 'string' },
     terms: { type: 'string' },
     'no-secrets': { type: 'boolean', default: false },
+    'skip-cjk': { type: 'boolean', default: false },
   },
 });
 const ROOT = resolve(opts.dir ?? join(import.meta.dirname, '..'));
@@ -139,7 +140,7 @@ function scan(files) {
     if (locale && HAS_CJK.test(text)) locales++;
     text.split('\n').forEach((line, i) => {
       const n = i + 1;
-      if (!locale && isProse(testish ? withoutStrings(line) : line)) report(file, n, 'cjk', line.trim());
+      if (!locale && !opts['skip-cjk'] && isProse(testish ? withoutStrings(line) : line)) report(file, n, 'cjk', line.trim());
       if (HOME.test(line)) report(file, n, 'private', `home folder: ${line.trim()}`);
       for (const term of TERMS) if (term.test(line)) report(file, n, 'private', `${term.source}: ${line.trim()}`);
       if (line.includes('../')) checkPath(file, n, line);
@@ -193,7 +194,7 @@ const locales = scan(files);
 checkDeps(files);
 if (!opts['no-secrets']) gitleaks(files);
 
-console.log(`public audit: ${files.length} files${locales ? `, ${locales} i18n dictionaries in CJK (expected)` : ''}${TERMS.length ? `, ${TERMS.length} private terms` : ''}${opts['no-secrets'] ? ', no secret scan' : ''}\n`);
+console.log(`public audit: ${files.length} files${locales ? `, ${locales} i18n dictionaries in CJK (expected)` : ''}${TERMS.length ? `, ${TERMS.length} private terms` : ''}${opts['no-secrets'] ? ', no secret scan' : ''}${opts['skip-cjk'] ? ', CJK prose allowed' : ''}\n`);
 for (const f of findings.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line)) {
   console.log(`  ${f.file}:${f.line}  ${f.check}  ${f.text.length > 140 ? `${f.text.slice(0, 140)}…` : f.text}`);
 }

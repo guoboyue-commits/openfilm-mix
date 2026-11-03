@@ -3,7 +3,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-ROOT = Path('studio/server/local-analyze/analyze.py')
+ROOT = Path(__file__).with_name('analyze.py')
 
 spec = importlib.util.spec_from_file_location('analyze', str(ROOT))
 az = importlib.util.module_from_spec(spec)
