@@ -17,6 +17,9 @@ dist/
 # local settings and secrets
 .env*
 
+# a running Studio records its pid, origin and key here
+.e2e-run.json
+
 # python bytecode
 __pycache__/
 *.pyc
