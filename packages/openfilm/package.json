@@ -2,7 +2,7 @@
   "name": "openfilm",
   "version": "0.2.5",
   "description": "The open source AI video agent: films as web pages, the manual that teaches your coding agent to make them, the `openfilm` command, and Studio, the editor to change anything in them.",
-  "license": "SEE LICENSE IN ../../LICENSE",
+  "license": "SEE LICENSE IN LICENSE",
   "homepage": "https://openfilm.dev",
   "repository": {
     "type": "git",

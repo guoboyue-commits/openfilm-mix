@@ -3,7 +3,7 @@
   "version": "0.2.5",
   "private": true,
   "type": "module",
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "description": "What OpenFilm's clients share: a chat turn and its public events, the agent's activity, prompt references, titles and Markdown parsing. Part of the desktop app; not published.",
   "homepage": "https://openfilm.dev",
   "repository": {
