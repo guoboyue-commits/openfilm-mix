@@ -1,0 +1,87 @@
+PolyForm Noncommercial License 1.0.0
+
+Copyright (c) 2026 OpenFilm contributors
+
+## Purpose
+
+This software is licensed for noncommercial use only. You may not use this
+software, in whole or in part, for any commercial purpose.
+
+"Commercial purpose" means any use intended for or directed toward commercial
+advantage or monetary compensation, including but not limited to: selling the
+software or any derivative of it; bundling it into a paid product or a paid
+service; using it to deliver paid client work; running it as part of a business
+workflow that generates revenue; and internal use by a for-profit organization
+in the course of its business.
+
+## Grant
+
+Subject to the conditions below, you are granted a worldwide, royalty-free,
+non-exclusive license to use, reproduce, modify, and distribute this software
+and derivative works of it, for noncommercial purposes only.
+
+## Conditions
+
+1. You must give appropriate credit, include this license with every copy of
+   the software or derivative work, and state clearly what changes you made.
+2. You may not use this software for any commercial purpose.
+3. You may not sublicense, sell, rent, lease, or otherwise transfer the
+   software for a fee, or grant any commercial rights to it.
+4. If you distribute a derivative work, it must be licensed under this same
+   license, and you may not add terms that restrict anyone else from
+   exercising the rights granted here for noncommercial use.
+5. This license does not grant any rights to the trademarks, logos, or brand
+   names of the copyright holders.
+
+## Termination
+
+Your rights under this license end automatically if you breach any of its
+conditions. On termination you must stop all use and distribution of the
+software and any derivative works.
+
+## No Warranty
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+## Commercial licensing
+
+Commercial use requires a separate written license from the copyright holders.
+
+## Upstream notice (must be kept)
+
+This project is a derivative work of OpenFilm, which is distributed under the
+MIT License. The original copyright notice and permission notice are retained
+here as that license requires:
+
+    MIT License
+
+    Copyright (c) 2026 OpenFilm contributors
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
+
+That MIT grant continues to apply to the upstream portions of this code. The
+noncommercial terms above apply to this repository's modifications and to the
+combined distribution as published here. If you need commercial rights to the
+modified work, a separate written license is required.

@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "openfilm-mix": {
+      "command": "node",
+      "args": [
+        "studio/server/mcp/server.mjs"
+      ],
+      "env": {
+        "OPENFILM_HOME": "~/.openfilm"
+      }
+    }
+  }
+}
