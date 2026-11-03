@@ -85,6 +85,28 @@ Premiere Pro and DaVinci Resolve.
 The desktop app ([apps/desktop](apps/desktop)) is Studio with a chat beside it, for Claude Code, Codex and the other
 agents, or its own agent with your own key.
 
+## Mix workbench
+
+This fork adds a batch workbench beside Studio, for teams that already have a pile of footage and need many cuts
+out of it. Everything runs on this machine; the only network calls are the ones you turn on.
+
+- **Assets and tags.** Import footage, pictures and sound into a library, tag them, and see each file duration and
+  whether it has been read yet. Tagging is how the workbench picks material: a mix can ask for a tag, a set of
+  paths, or keywords matched against the notes below.
+- **Content notes at 0.01 s.** Locally, with ffmpeg for shots and Whisper for speech, each asset gets a timeline
+  such as `0:00.00-1.28s product in close-up, coming nearer` and `1.29-5.24s product narration, line: ...`. Exported
+  films get the same treatment, so a finished cut is searchable and reviewable, not just a file.
+- **One-click films.** Pick assets or a tag, say how long and in what aspect, and the workbench plans, cuts and
+  exports. Give it a voice-over and the picture is laid to that length; the word timeline that comes back becomes
+  the subtitles.
+- **Voice-over.** A local engine by default, or a cloud provider with your own key; switching between the two is a
+  setting, not a separate build.
+- **Local agent.** The same operations are exposed to a coding agent over MCP (stdio), so "cut two 15 s verticals
+  from the product tag and export them" is a single request, not fifteen clicks.
+
+Run Studio from this checkout and the workbench is the page Studio opens at `/`; a project opens at
+`/projects/<id>` as the timeline editor, and "Open in editor" swaps between them. `GET /api/batch/api` lists every
+endpoint the workbench offers; the MCP server is `packages/openfilm/studio/server/mcp/server.mjs`.
 ## How it works
 
 A film is a folder with a `film.html`: tracks of clips cut together.
