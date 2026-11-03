@@ -17,6 +17,16 @@ dist/
 # local settings and secrets
 .env*
 
+# python bytecode
+__pycache__/
+*.pyc
+
+# scratch files at the root
+/_*.cjs
+/_*.ps1
+/_*.png
+/_*.txt
+
 # OS and editors
 .DS_Store
 *.log
