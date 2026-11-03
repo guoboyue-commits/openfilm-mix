@@ -1,0 +1,54 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The mix workbench: public audit, the workbench tests, and analyze.py, through one entry point.
+  # No lockfile install; only playwright-core is fetched, and with scripts disabled.
+  workbench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      # tools.test.mjs reaches src/host.mjs through src/shared.mjs; that import needs playwright-core
+      # even though no browser is launched here. No lockfile install, no postinstall scripts.
+      - name: The one dependency these tests import
+        working-directory: packages/openfilm
+        run: npm install --ignore-scripts --omit=dev --no-save --no-package-lock --no-audit --no-fund playwright-core@1.61.1
+      # Same entry point a contributor runs locally, so green here means what green there means.
+      - name: Workbench checks
+        run: node scripts/verify.mjs
+
+  # Every commit, every branch: nothing that looks like a credential ever lands.
+  secrets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GITLEAKS_VERSION: 8.30.1
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install gitleaks
+        run: |
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar -xz -C "$RUNNER_TEMP" gitleaks
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      - name: Scan the history
+        run: gitleaks git --config .gitleaks.toml --redact --no-banner --verbose .
