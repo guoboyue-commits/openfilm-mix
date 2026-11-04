@@ -234,18 +234,53 @@ def split_sentences(text):
 
 
 MODELS = {}
+# 模型文件坏了或没下完时，退回本机已有的档位，而不是让整条识别失败。
+FALLBACK = {'large-v3': 'medium', 'large-v2': 'medium', 'medium': 'small', 'small': 'base', 'base': 'tiny'}
 
+
+def pick_model(model_size):
+    """按顺序试：想要的档位 → 更小的档位。只认可解析到的模型，不全就往下走。"""
+    from faster_whisper import WhisperModel
+    wanted = model_size or 'small'
+    tried = []
+    name = wanted
+    while name:
+        if name not in MODELS:
+            try:
+                MODELS[name] = WhisperModel(name, device='cpu', compute_type='int8')
+            except Exception as e:  # noqa: BLE001
+                tried.append(f'{name}: {e}')
+                name = FALLBACK.get(name)
+                continue
+        return MODELS[name], name, tried
+    raise RuntimeError('没有可用的 Whisper 模型：' + '; '.join(tried))
+
+
+MIRROR = os.environ.get('OPENFILM_HF_MIRROR', 'https://hf-mirror.com')
+
+
+def fetch_model(model_size='small', mirror=None):
+    """把模型下载进 Hugging Face 缓存（默认走国内镜像）。已下完的文件不会重下。
+
+    国内直连 huggingface.co 常常超时；模型是一次性成本，下好之后识别完全离线。
+    """
+    from huggingface_hub import hf_hub_download
+    repo = model_size if '/' in model_size else f'Systran/faster-whisper-{model_size}'
+    short = repo.split('/')[-1].replace('faster-whisper-', '')
+    base = (mirror or MIRROR).rstrip('/')
+    files = ['config.json', 'model.bin', 'tokenizer.json', 'vocabulary.txt']
+    got = {}
+    for name in files:
+        got[name] = hf_hub_download(repo_id=repo, filename=name, endpoint=base)
+    return {'ok': True, 'model': short, 'files': got}
 
 def whisper_model(model_size):
     """本机 Whisper 模型只加载一次：常驻进程里每批复用，省掉十几秒的启动时间。"""
-    if model_size not in MODELS:
-        from faster_whisper import WhisperModel
-        MODELS[model_size] = WhisperModel(model_size, device='cpu', compute_type='int8')
-    return MODELS[model_size]
+    return pick_model(model_size)[0]
 
 
 def transcribe(path, language, model_size):
-    model = whisper_model(model_size)
+    model, used, tried = pick_model(model_size)
     segs, info = model.transcribe(str(path), language=language, vad_filter=True, beam_size=1,
                                   condition_on_previous_text=False,
                                   initial_prompt='以下是普通话的句子，关于产品介绍和卖点。')
@@ -263,7 +298,7 @@ def transcribe(path, language, model_size):
             take = span * len(line) / total
             out.append({'start': round(at, 2), 'end': round(at + take, 2), 'text': line})
             at += take
-    return out, getattr(info, 'language', language)
+    return out, getattr(info, 'language', language), used, tried
 
 def cues_of(path, language, model_size):
     """只做台词：把一条配音/音频转成逐句 {text,start,end}，给字幕用。
@@ -271,10 +306,10 @@ def cues_of(path, language, model_size):
     旧版本生成的配音没有 wav 旁边的 .cues.json，烧字幕时就用它现场对齐一次。
     只读音频、不抽帧，比完整识别快得多。
     """
-    speech, lang = transcribe(path, language, model_size)
+    speech, lang, used, tried = transcribe(path, language, model_size)
     cues = [{'text': one['text'], 'start': round(float(one['start']), 3), 'end': round(float(one['end']), 3)}
             for one in speech if one.get('text') and float(one['end']) > float(one['start'])]
-    return {'ok': True, 'language': lang, 'cues': cues}
+    return {'ok': True, 'language': lang, 'model': used, 'fallbacks': tried, 'cues': cues}
 
 def clock(seconds):
     """时间线用的时间码：0:00 / 1:28.50（和 Node 端 timelineText 一致）。"""
@@ -322,7 +357,10 @@ def build(path, language, model_size, skip_speech, min_shot=1.2, want_quality=Tr
     global frames_fps
     frames_fps, raws = sample_frames(path, duration)
     stats = [stats_of(b) for b in raws]
-    speech, lang = ([], language) if skip_speech or not has_audio else transcribe(path, language, model_size)
+    if skip_speech or not has_audio:
+        speech, lang, used, tried = [], language, None, []
+    else:
+        speech, lang, used, tried = transcribe(path, language, model_size)
     cuts = detect_cuts(raws, duration, frames_fps, min_shot)
     bounds = cuts + [round(duration, 2)]
     # 一个镜头里说了很多句时，按句子的起点再切一刀：时间线更像字幕，也更好定位
@@ -368,6 +406,7 @@ def build(path, language, model_size, skip_speech, min_shot=1.2, want_quality=Tr
     # 成片质检：黑帧/静音/抖动/分辨率，时间精确到 0.01 秒
     quality = quality_of(path, duration, has_audio, stats, frames_fps) if want_quality else None
     return {'ok': True, 'duration': round(duration, 2), 'language': lang, 'hasAudio': has_audio,
+            'model': used, 'fallbacks': tried,
             'speech': speech, 'segments': segments, 'quality': quality}
 
 
@@ -504,7 +543,7 @@ def serve():
         rid = req.get('id')
         jobs = req.get('jobs') or []
         language = req.get('language') or 'zh'
-        model_size = req.get('model') or 'base'
+        model_size = req.get('model') or 'small'
         skip = bool(req.get('skipSpeech'))
         min_shot = float(req.get('minShot') or 1.2)
         want_quality = req.get('quality') is not False
@@ -530,15 +569,29 @@ def main():
     ap.add_argument('input', nargs='?', default='')
     ap.add_argument('--language', default='zh')
     ap.add_argument('--skip-speech', action='store_true')
-    ap.add_argument('--model', default='base')
+    ap.add_argument('--model', default='small')
     ap.add_argument('--batch', action='store_true')
     ap.add_argument('--serve', action='store_true')
     ap.add_argument('--cues', action='store_true')
     ap.add_argument('--jobs', default='')
     ap.add_argument('--out')
+    ap.add_argument('--fetch-model', nargs='?', const='small', default=None,
+                        help='下载识别模型到本机缓存（默认 small，走国内镜像），下完就离线可用')
+    ap.add_argument('--mirror', default=None, help='模型下载镜像，默认 https://hf-mirror.com')
     args = ap.parse_args()
     if args.serve:
         return serve()
+    if args.fetch_model:
+        try:
+            result = fetch_model(args.fetch_model, args.mirror)
+        except Exception as e:  # noqa: BLE001
+            result = {'ok': False, 'error': f'{type(e).__name__}: {e}'}
+        body = json.dumps(result, ensure_ascii=False)
+        if args.out:
+            Path(args.out).write_text(body, encoding='utf-8')
+        else:
+            sys.stdout.write(body)
+        return 0 if result.get('ok') else 1
     try:
         if args.cues:
             result = cues_of(Path(args.input), args.language, args.model)

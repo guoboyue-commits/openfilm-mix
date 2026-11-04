@@ -15,6 +15,8 @@
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { existsSync } from 'node:fs';
+import { readdir, stat } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -35,20 +37,36 @@ const PYTHONS = [
 /** 一次识别最多几条：9 条素材约 20 秒；一次太多会让页面等太久。 */
 export const MAX_FILES = 24;
 const TIMEOUT_MS = 30 * 60_000;
+/** 识别默认用 small：同一条中文口播，base 会把「拓展视野」听成「拖展事业」，small 不会。 */
+export const DEFAULT_MODEL = process.env.OPENFILM_WHISPER_MODEL || 'small';
 
-let running = 0;
-/** @type {Array<() => void>} */
-const waiting = [];
-/** 同一时间只跑一个识别进程：模型只加载一次，也避免 CPU 抢满。 */
-async function slot() {
-  if (running > 0) await new Promise((resolve) => { waiting.push(() => resolve(undefined)); });
-  running += 1;
+/**
+ * 本机已经下好的 Whisper 档位：读 Hugging Face 缓存里 model.bin 的大小，不联网。
+ * 下了一半的模型也在缓存里，但 model.bin 是 0 字节或明显偏小，所以按大小判断。
+ */
+async function localModels() {
+  const cache = process.env.HF_HUB_CACHE || join(homedir(), '.cache', 'huggingface', 'hub');
+  const dirs = await readdir(cache, { withFileTypes: true }).catch(() => []);
+  const found = [];
+  for (const dir of dirs) {
+    if (!dir.isDirectory() || !dir.name.startsWith('models--Systran--faster-whisper-')) continue;
+    const size = await modelSize(join(cache, dir.name));
+    /* 最小的 tiny 也有几十 MB；小于 1 MB 的只能是没下完的占位文件 */
+    if (size > 1_000_000) found.push({ name: dir.name.replace('models--Systran--faster-whisper-', ''), bytes: size });
+  }
+  return found.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-function release() {
-  running -= 1;
-  const next = waiting.shift();
-  if (next) next();
+/** 一个模型缓存的 model.bin 有多大（0 = 没下载完或没有）。 */
+async function modelSize(/** @type {string} */ dir) {
+  const snaps = await readdir(join(dir, 'snapshots'), { withFileTypes: true }).catch(() => []);
+  let best = 0;
+  for (const snap of snaps) {
+    if (!snap.isDirectory()) continue;
+    const info = await stat(join(dir, 'snapshots', snap.name, 'model.bin')).catch(() => null);
+    if (info && info.size > best) best = info.size;
+  }
+  return best;
 }
 
 /** 找一个能用的 Python（装了 faster-whisper 的优先）。 */
@@ -98,6 +116,8 @@ async function probeStatus() {
     ffmpeg: await which('ffmpeg'),
     whisper: probe.ok,
     whisperVersion: probe.ok ? probe.version : null,
+    model: DEFAULT_MODEL,
+    models: probe.ok ? await localModels() : [],
     error: probe.ok ? null : `faster-whisper 没装好：${probe.error ?? ''}。可以先只做画面识别，或 pip install faster-whisper`,
   };
 }
@@ -190,7 +210,7 @@ export async function analyzeFiles(/** @type {Array<{ path: string, rel: string 
         onProgress: (event) => { const rel = event.path ? byPath.get(event.path) : null; if (rel) options.onProgress?.(rel); },
         done: (/** @type {{ ok: boolean, result?: any, error?: string }} */ r) => { clearTimeout(timer); resolve(r); },
       });
-      const ask = { id, jobs: files.map((f) => ({ path: f.path })), language: options.language, model: options.model, skipSpeech: options.skipSpeech === true, ...(options.minShot ? { minShot: options.minShot } : {}), ...(options.quality === false ? { quality: false } : {}) };
+      const ask = { id, jobs: files.map((f) => ({ path: f.path })), language: options.language, model: options.model || DEFAULT_MODEL, skipSpeech: options.skipSpeech === true, ...(options.minShot ? { minShot: options.minShot } : {}), ...(options.quality === false ? { quality: false } : {}) };
       state.proc.stdin?.write(JSON.stringify(ask) + '\n');
     });
     if (!answer.ok) return { results: [], error: answer.error };
@@ -229,9 +249,9 @@ export async function transcribeCues(/** @type {string} */ file, /** @type {{ la
   const python = await findPython();
   if (!python) throw new Error('没找到 Python 3；装一个 Python 3.10+，或把路径写进 OPENFILM_PYTHON');
   if (!existsSync(SCRIPT)) throw new Error('本地识别脚本不在：studio/server/local-analyze/analyze.py');
-  const args = [SCRIPT, file, '--cues', '--language', options.language || 'zh', '--model', options.model || 'base'];
+  const args = [SCRIPT, file, '--cues', '--language', options.language || 'zh', '--model', options.model || DEFAULT_MODEL];
   const out = await new Promise((/** @type {(r: { code: number | null, stdout: string, stderr: string }) => void} */ resolve) => {
-    const proc = spawn(python, args, { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    const proc = spawn(python, args, { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], env: residentEnv() });
     let stdout = '', stderr = '';
     proc.stdout.on('data', (d) => { stdout += d; });
     proc.stderr.on('data', (d) => { stderr += d; });
