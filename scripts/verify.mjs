@@ -38,6 +38,8 @@ function python() {
 const results = [];
 results.push(step('public audit (no secrets, CJK prose allowed)', 'node', ['scripts/audit-public.mjs', '--no-secrets', '--skip-cjk'], ROOT));
 
+/* A module that names something it never imported throws here, before any test can hide it. */
+results.push(step('workbench modules load', 'node', ['scripts/load-workbench.mjs'], ROOT));
 /* tools.test.mjs reaches src/host.mjs through src/shared.mjs, and that file needs playwright-core even though it
    never launches a browser here. Say so plainly instead of letting a stack trace explain it. */
 if (!existsSync(join(PKG, 'node_modules', 'playwright-core'))) {

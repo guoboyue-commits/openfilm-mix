@@ -122,6 +122,24 @@ async function probeStatus() {
   };
 }
 
+let running = 0;
+/** @type {Array<() => void>} */
+const waiting = [];
+/**
+ * 同一时间只跑一个识别进程：模型只加载一次，也避免 CPU 抢满。
+ * 导出是为了让测试真的走到这道闸门：之前它被误删过，只有运行时才暴露。
+ */
+export async function slot() {
+  if (running > 0) await new Promise((resolve) => { waiting.push(() => resolve(undefined)); });
+  running += 1;
+}
+
+export function release() {
+  running -= 1;
+  const next = waiting.shift();
+  if (next) next();
+}
+
 function which(/** @type {string} */ name) {
   return new Promise((resolve) => {
     const proc = spawn(name, ['-version'], { windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] });

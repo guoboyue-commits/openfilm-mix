@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { timelineText } from './tools.mjs';
 import { cuesToAss } from './subtitle.mjs';
+import { analyzeFiles, analyzeStatus, release, slot } from '../batch-analyze.mjs';
 
 test('时间线起止用同一套 m:ss.cc，超过一分钟也不会混用纯秒数', () => {
   const note = { segments: [
@@ -35,4 +36,24 @@ test('越界的 bottom 退回默认值，不会把字幕顶到画面外', () => 
     const line = cuesToAss(cues, { bottom: bad }).split('\n').find((one) => one.startsWith('Style: Default,'));
     assert.ok(line.endsWith(',269,134'), 'bottom ' + String(bad) + ' should fall back to 11%');
   }
+});
+
+test('batch analyze: status probes and empty run do not reference missing identifiers', async () => {
+  const status = await analyzeStatus();
+  assert.equal(typeof status.ok, 'boolean');
+  assert.ok(Array.isArray(status.models), 'status lists which models are on this machine');
+  const empty = await analyzeFiles([]);
+  assert.deepEqual(empty, { results: [] });
+});
+
+test('batch analyze: only one analysis runs at a time', async () => {
+  await slot();
+  let second = false;
+  const queued = slot().then(() => { second = true; });
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(second, false, 'a second analysis waits for the first');
+  release();
+  await queued;
+  assert.equal(second, true, 'and starts once the first is done');
+  release();
 });
